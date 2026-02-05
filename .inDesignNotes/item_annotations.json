@@ -12,5 +12,33 @@
       }
     ],
     "description": "sdcsdc"
+  },
+  {
+    "timestamp": "2026-02-05T16:02:59.989301",
+    "items": [
+      {
+        "type": "Footprint",
+        "description": "R3",
+        "uuid": "",
+        "x": 143975000,
+        "y": 102225000,
+        "layer": 0
+      }
+    ],
+    "description": "ttt"
+  },
+  {
+    "timestamp": "2026-02-05T16:03:08.608680",
+    "items": [
+      {
+        "type": "Footprint",
+        "description": "J1",
+        "uuid": "",
+        "x": 152155000,
+        "y": 90195000,
+        "layer": 0
+      }
+    ],
+    "description": "sdcscdsdcsdc"
   }
 ]
