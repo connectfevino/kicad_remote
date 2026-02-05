@@ -139,34 +139,77 @@ class TeamLinkManager:
 # UI CLASSES
 # =============================================================================
 class SimpleTaskPanel(wx.Panel):
+    """Professional Task Card with Checkbox, Priority Badges, and Metadata."""
     def __init__(self, parent, task, on_status, on_delete):
-        super().__init__(parent); self.task = task; self.on_status = on_status; self.on_delete = on_delete
-        self.SetBackgroundColour(wx.Colour(250, 250, 250))
+        super().__init__(parent)
+        self.task = task
+        self.on_status = on_status
+        self.on_delete = on_delete
+        
+        self.SetBackgroundColour(wx.Colour(255, 255, 255))
+        
         sizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        # Info
-        info_sizer = wx.BoxSizer(wx.VERTICAL)
-        prio = task.get('priority', 'Medium'); title = task.get('title', 'No Title'); user = task.get('author', 'Unknown')
+        # 1. The "Tick Mark" (Checkbox)
+        self.cb = wx.CheckBox(self)
+        self.cb.SetValue(task.get('completed', False))
+        self.cb.Bind(wx.EVT_CHECKBOX, lambda e: self.on_status(self.task, self.cb.GetValue()))
+        sizer.Add(self.cb, 0, wx.ALIGN_TOP|wx.ALL, 8)
         
-        lbl_h = wx.StaticText(self, label=f"[{prio}] {title}")
-        f = lbl_h.GetFont(); f.SetWeight(wx.FONTWEIGHT_BOLD); lbl_h.SetFont(f); lbl_h.Wrap(350); info_sizer.Add(lbl_h, 0, wx.EXPAND|wx.BOTTOM, 2)
+        # 2. Content Area
+        content = wx.BoxSizer(wx.VERTICAL)
         
+        # Header: Title + Priority
+        header = wx.BoxSizer(wx.HORIZONTAL)
+        
+        # Priority Color Code
+        prio = task.get('priority', 'Medium')
+        p_col = wx.Colour(100, 100, 100) # Default Gray
+        if prio == 'High': p_col = wx.Colour(220, 50, 50) # Red
+        elif prio == 'Medium': p_col = wx.Colour(255, 140, 0) # Orange
+        elif prio == 'Low': p_col = wx.Colour(80, 180, 80) # Green
+        
+        lbl_prio = wx.StaticText(self, label=f" {prio.upper()} ")
+        lbl_prio.SetBackgroundColour(p_col); lbl_prio.SetForegroundColour(wx.WHITE)
+        f_p = lbl_prio.GetFont(); f_p.SetWeight(wx.FONTWEIGHT_BOLD); f_p.SetPointSize(7); lbl_prio.SetFont(f_p)
+        header.Add(lbl_prio, 0, wx.ALIGN_CENTER_VERTICAL|wx.RIGHT, 5)
+        
+        title = task.get('title', 'Untitled')
+        lbl_t = wx.StaticText(self, label=title)
+        f_t = lbl_t.GetFont(); f_t.SetWeight(wx.FONTWEIGHT_BOLD); f_t.SetPointSize(10); lbl_t.SetFont(f_t)
+        header.Add(lbl_t, 1, wx.EXPAND)
+        
+        content.Add(header, 0, wx.EXPAND|wx.BOTTOM, 2)
+        
+        # Description
         desc = task.get('description', '')
-        if desc: l_d = wx.StaticText(self, label=desc); l_d.Wrap(350); info_sizer.Add(l_d, 0, wx.EXPAND|wx.BOTTOM, 2)
+        if desc:
+            lbl_d = wx.StaticText(self, label=desc)
+            lbl_d.SetForegroundColour(wx.Colour(60, 60, 60))
+            content.Add(lbl_d, 0, wx.EXPAND|wx.BOTTOM, 2)
+            
+        # Metadata Footer
+        auth = task.get('author', 'Unknown')
+        ts = task.get('timestamp_str', '')
+        meta = f"By: {auth}"
+        if ts: meta += f"  |  {ts}"
         
-        l_a = wx.StaticText(self, label=f"By: {user}"); l_a.SetForegroundColour(wx.Colour(120, 120, 120)); 
-        f2 = l_a.GetFont(); f2.SetPointSize(8); l_a.SetFont(f2); info_sizer.Add(l_a, 0, wx.EXPAND)
+        lbl_m = wx.StaticText(self, label=meta)
+        f_m = lbl_m.GetFont(); f_m.SetPointSize(8); lbl_m.SetFont(f_m)
+        lbl_m.SetForegroundColour(wx.Colour(150, 150, 150))
+        content.Add(lbl_m, 0, wx.EXPAND)
         
-        sizer.Add(info_sizer, 1, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        sizer.Add(content, 1, wx.ALL|wx.EXPAND, 5)
         
-        # Btns
-        btns = wx.BoxSizer(wx.VERTICAL)
-        lbl_s = "Undo" if task['completed'] else "Done"
-        b_s = wx.Button(self, label=lbl_s, size=(50, 22)); b_s.Bind(wx.EVT_BUTTON, lambda e: self.on_status(self.task, not self.task['completed']))
-        b_d = wx.Button(self, label="Del", size=(50, 22)); b_d.Bind(wx.EVT_BUTTON, lambda e: self.on_delete(self.task['id']))
-        btns.Add(b_s, 0, wx.BOTTOM, 2); btns.Add(b_d, 0)
-        
-        sizer.Add(btns, 0, wx.ALL|wx.ALIGN_CENTER_VERTICAL, 5)
+        # 3. Actions (Delete) - ONLY for Pending tasks to preserve History
+        if not task.get('completed', False):
+            # Safe Delete Button
+            btn_del = wx.Button(self, label="Delete", size=(-1, 24))
+            btn_del.SetForegroundColour(wx.Colour(200, 50, 50))
+            btn_del.SetToolTip("Delete Task")
+            btn_del.Bind(wx.EVT_BUTTON, lambda e: self.on_delete(task['id']))
+            sizer.Add(btn_del, 0, wx.ALIGN_TOP|wx.ALL, 5)
+            
         self.SetSizer(sizer)
 
 class AnnotationDialog(wx.Dialog):
@@ -258,6 +301,16 @@ class MainFrame(wx.Frame):
     # --- KANBAN ---
     def _create_kanban_tab(self, parent):
         panel = wx.Panel(parent); sizer = wx.BoxSizer(wx.VERTICAL)
+        
+        # Professional Header: Progress
+        self.gauge = wx.Gauge(panel, range=100, size=(-1, 6))
+        sizer.Add(self.gauge, 0, wx.EXPAND|wx.TOP|wx.LEFT|wx.RIGHT, 0)
+        
+        self.lbl_prog = wx.StaticText(panel, label="Project Status: 0% Complete")
+        f_g = self.lbl_prog.GetFont(); f_g.SetWeight(wx.FONTWEIGHT_BOLD); f_g.SetPointSize(8); self.lbl_prog.SetFont(f_g)
+        self.lbl_prog.SetForegroundColour(wx.Colour(100, 100, 100))
+        sizer.Add(self.lbl_prog, 0, wx.ALIGN_RIGHT|wx.RIGHT|wx.BOTTOM, 5)
+        
         # Controls
         controls = wx.BoxSizer(wx.HORIZONTAL)
         controls.Add(wx.StaticText(panel, label="Filter:"), 0, wx.ALIGN_CENTER_VERTICAL, 5)
@@ -269,12 +322,13 @@ class MainFrame(wx.Frame):
         self.t_de = wx.TextCtrl(panel); self.t_de.SetHint("Description"); controls.Add(self.t_de, 1, wx.RIGHT, 5)
         b_add = wx.Button(panel, label="Add"); b_add.Bind(wx.EVT_BUTTON, self._add_task); controls.Add(b_add, 0)
         sizer.Add(controls, 0, wx.EXPAND|wx.ALL, 5)
+        
         # Splitter
         sp = wx.SplitterWindow(panel, style=wx.SP_3D)
         p1 = wx.Panel(sp); sz1 = wx.BoxSizer(wx.VERTICAL); sz1.Add(wx.StaticText(p1, label="--- PENDING ---"),0,wx.ALL|wx.CENTER,5)
         self.sc1 = wx.ScrolledWindow(p1); self.sc1.SetScrollRate(5,5); self.vb1 = wx.BoxSizer(wx.VERTICAL); self.sc1.SetSizer(self.vb1)
         sz1.Add(self.sc1,1,wx.EXPAND); p1.SetSizer(sz1)
-        p2 = wx.Panel(sp); sz2 = wx.BoxSizer(wx.VERTICAL); sz2.Add(wx.StaticText(p2, label="--- DONE ---"),0,wx.ALL|wx.CENTER,5)
+        p2 = wx.Panel(sp); sz2 = wx.BoxSizer(wx.VERTICAL); sz2.Add(wx.StaticText(p2, label="--- COMPLETED HISTORY ---"),0,wx.ALL|wx.CENTER,5)
         self.sc2 = wx.ScrolledWindow(p2); self.sc2.SetScrollRate(5,5); self.vb2 = wx.BoxSizer(wx.VERTICAL); self.sc2.SetSizer(self.vb2)
         sz2.Add(self.sc2,1,wx.EXPAND); p2.SetSizer(sz2)
         sp.SplitHorizontally(p1,p2); sp.SetSashGravity(0.5); sizer.Add(sp,1,wx.EXPAND|wx.ALL,5); panel.SetSizer(sizer)
@@ -282,18 +336,41 @@ class MainFrame(wx.Frame):
 
     def _refresh_kanban(self, e=None):
         self.vb1.Clear(True); self.vb2.Clear(True)
+        
+        # Calculate Stats
+        total = len(self.tasks)
+        done = len([t for t in self.tasks if t.get('completed')])
+        pct = int((done/total)*100) if total > 0 else 0
+        try:
+             self.gauge.SetValue(pct)
+             self.lbl_prog.SetLabel(f"Project Status: {done}/{total} Tasks ({pct}%)")
+        except: pass
+        
         f = self.cb_filt.GetValue()
         for t in self.tasks:
             if f != "All" and t.get('priority') != f: continue
-            parent, sizer = (self.sc2, self.vb2) if t['completed'] else (self.sc1, self.vb1)
-            sizer.Add(SimpleTaskPanel(parent, t, self._set_t_stat, self._del_t), 0, wx.EXPAND|wx.ALL, 2)
+            parent, sizer = (self.sc2, self.vb2) if t.get('completed') else (self.sc1, self.vb1)
+            sizer.Add(SimpleTaskPanel(parent, t, self._set_t_stat, self._del_t), 0, wx.EXPAND|wx.ALL|wx.TOP, 1) # Reduced padding
             sizer.Add(wx.StaticLine(parent), 0, wx.EXPAND)
         self.sc1.Layout(); self.sc2.Layout()
 
     def _add_task(self,e):
         ti = self.t_ti.GetValue().strip()
         if ti:
-            t={'id':int(datetime.now().timestamp()*1000),'title':ti,'description':self.t_de.GetValue(),'priority':self.cb_p.GetValue(),'author':self.dm.user,'completed':False}
+            # Professional Metadata
+            import socket
+            hostname = socket.gethostname()
+            full_author = f"{self.dm.user}@{hostname}"
+            ts_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            t={'id':int(datetime.now().timestamp()*1000),
+               'title':ti,
+               'description':self.t_de.GetValue(),
+               'priority':self.cb_p.GetValue(),
+               'author': full_author,
+               'timestamp_str': ts_str,
+               'completed':False}
+            
             self.tasks.append(t); self.dm.save_tasks(self.tasks); self.t_ti.Clear(); self.t_de.Clear(); self._refresh_kanban()
     def _set_t_stat(self,t,s): t['completed']=s; self.dm.save_tasks(self.tasks); self._refresh_kanban()
     def _del_t(self,tid): self.tasks=[x for x in self.tasks if x['id']!=tid]; self.dm.save_tasks(self.tasks); self._refresh_kanban()
