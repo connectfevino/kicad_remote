@@ -1,7 +1,7 @@
 """
 KiCad InDesignNote Plugin
 Professional Design Notes, Kanban Task Manager & Team Link for KiCad.
-Version 3.1.0 - Robustness & Multi-Select Update
+Version 3.5.0 - Clean & Robust (No Git)
 """
 
 import pcbnew
@@ -24,7 +24,6 @@ FILE_NOTES = "item_annotations.json"
 PRIORITY_HIGH = "High"
 PRIORITY_MED = "Medium"
 PRIORITY_LOW = "Low"
-
 DEFAULT_PORT = 5005
 
 # =============================================================================
@@ -252,7 +251,6 @@ class MainFrame(wx.Frame):
         elif d.get("type") == "chat": self._log(f"{d['user']}: {d['msg']}")
         elif d.get("type") == "focus":
             self._log(f"[Sys] Remote focus request...")
-            # Unpack full items list if available
             self._perform_focus(d.get("items", [])) 
 
     def _log(self, t): self.log.AppendText(t+"\n")
@@ -395,64 +393,59 @@ class MainFrame(wx.Frame):
         self._perform_focus(all_items)
 
     def _perform_focus(self, item_dicts):
+        """Robust cross-probing with Ref fallback."""
         try:
-            board = pcbnew.GetBoard(); found = False; bbox = None; target_layer = None
-            for x in board.Footprints(): x.ClearSelected()
-            for x in board.Tracks(): x.ClearSelected()
-            for x in board.Drawings(): x.ClearSelected()
+            board = pcbnew.GetBoard()
+            if not board: return
+            
+            # Clear Selection
+            for x in board.GetFootprints(): x.ClearSelected() 
+            for x in board.GetTracks(): x.ClearSelected()
+            for x in board.GetDrawings(): x.ClearSelected()
             for x in board.Zones(): x.ClearSelected()
 
-            uuids = [x.get('uuid') for x in item_dicts]
+            # Targets
+            uuids = set([x.get('uuid') for x in item_dicts if x.get('uuid')])
+            refs = set([x.get('description') for x in item_dicts if x.get('type') == 'Footprint'])
             
-            def check(obj):
-                nonlocal found, bbox, target_layer
-                match = False
-                # Try UUID
+            found = False
+            
+            # Helpers
+            def match_uuid(obj):
                 try: 
-                    if obj.GetKIID().AsString() in uuids: match = True
-                except: 
-                    try: 
-                         if obj.GetUuid().AsString() in uuids: match = True
+                    if obj.GetKIID().AsString() in uuids: return True
+                except:
+                    try:
+                        if obj.GetUuid().AsString() in uuids: return True
                     except: pass
-                
-                if match:
-                    obj.SetSelected(); found = True
-                    if not bbox: bbox = obj.GetBoundingBox()
-                    else: bbox.Merge(obj.GetBoundingBox())
-                    if target_layer is None: target_layer = obj.GetLayer()
+                return False
 
-            for x in board.Footprints(): check(x)
-            for x in board.Tracks(): check(x)
-            for x in board.Drawings(): check(x)
-            for x in board.Zones(): check(x)
-            
-            # Robust Fallback: If no object found by UUID, look for coordinates
-            if not found and item_dicts:
-                # Use first item coordinate as backup
-                i = item_dicts[0]
-                if i.get('x') and i.get('y'):
-                     # Dummy Zoom to coordinate
-                     pcbnew.WindowZoom(i['x'], i['y'], 10000000, 10000000) # Arbitrary small window
-                     # Also try to switch layer if saved
-                     if i.get('layer') is not None:
-                         pcbnew.GetBoard().GetDesignSettings().SetVisibleLayers(i['layer'])
-                     return 
+            # 1. Footprints (UUID + Reference Fallback)
+            for fps in board.GetFootprints():
+                if match_uuid(fps) or (fps.GetReference() in refs):
+                    fps.SetSelected()
+                    found = True
+
+            # 2. Tracks
+            for trk in board.GetTracks():
+                if match_uuid(trk): 
+                    trk.SetSelected(); found = True
+
+            # 3. Drawings/Graphics
+            for drw in board.GetDrawings():
+                if match_uuid(drw): 
+                    drw.SetSelected(); found = True
+
+            # 4. Zones
+            for zn in board.Zones():
+                if match_uuid(zn): 
+                    zn.SetSelected(); found = True
 
             if found:
                 pcbnew.Refresh()
-                # Auto Layer Switch (Feature!)
-                if target_layer is not None:
-                     # This command switches the active layer in pcbnew
-                     # Note: This API might vary, but standard way is usually via PCB_EDITOR connection
-                     # For basic scripting, we can only highlight. 
-                     pass 
-
-                if bbox:
-                    try: 
-                        m = int(max(bbox.GetWidth(), bbox.GetHeight())*0.2); bbox.Inflate(m)
-                        pcbnew.WindowZoom(bbox.GetX(), bbox.GetY(), bbox.GetWidth(), bbox.GetHeight())
-                    except: pass
-        except: pass
+        
+        except Exception as e:
+            wx.MessageBox(f"Focus Error: {e}")
 
 # =============================================================================
 # ENTRY
