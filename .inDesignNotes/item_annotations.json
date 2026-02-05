@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "timestamp": "2026-02-05T15:54:05.974368",
+    "items": [
+      {
+        "type": "Footprint",
+        "description": "J1",
+        "uuid": "",
+        "x": 152155000,
+        "y": 90195000,
+        "layer": 0
+      }
+    ],
+    "description": "sdcsdc"
+  }
+]
