@@ -13,6 +13,8 @@ import threading
 import getpass
 from datetime import datetime
 
+from pathlib import Path
+
 # =============================================================================
 # CONSTANTS
 # =============================================================================
@@ -528,7 +530,21 @@ class MainFrame(wx.Frame):
 # ENTRY
 # =============================================================================
 class InDesignNotePlugin(pcbnew.ActionPlugin):
-    def defaults(self): self.name = PLUGIN_NAME; self.category = "Utilities"; self.description = "Team Collab Note Tool"; self.show_toolbar_button = True
+    # def defaults(self): self.name = PLUGIN_NAME; self.category = "Utilities"; self.description = "Team Collab Note Tool"; self.show_toolbar_button = True
+
+
+    def defaults(self):
+        self.name = PLUGIN_NAME
+        self.category = "Utilities"
+        self.description = "Team Collab Note Tool"
+
+
+        plugin_dir = Path(__file__).resolve().parent 
+        self.resources_dir = plugin_dir.parent.parent / "resources" / plugin_dir.name
+        self.icon_file_name = str(self.resources_dir / "icon.png")
+        self.show_toolbar_button = True
+
+
     def Run(self):
         try:
             board = pcbnew.GetBoard()
