@@ -1,0 +1,33 @@
+{
+    "layout": {
+        "hspace": "0.5mm",
+        "vspace": "0.5mm",
+        "hbonefirst": "1",
+        "rows": "2",
+        "cols": "2"
+    },
+    "tabs": {
+        "vwidth": "5mm",
+        "hwidth": "5mm",
+        "spacing": "12mm"
+    },
+    "cuts": {
+        "type": "mousebites"
+    },
+    "framing": {
+        "type": "tightframe"
+    },
+    "fiducials": {
+        "type": "4fid",
+        "hoffset": "2mm",
+        "voffset": "2mm"
+    },
+    "text": {
+        "type": "simple",
+        "voffset": "2mm",
+        "text": "FEVINO INDUSTRIES LLP,PUNE"
+    },
+    "page": {
+        "anchor": "tl"
+    }
+}
